@@ -1,1 +1,0 @@
-Free API access is not supported for this chain. Please upgrade your api plan for full chain coverage. https://etherscan.io/apis
