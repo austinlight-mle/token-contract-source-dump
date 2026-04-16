@@ -50,6 +50,7 @@ Scans all PancakeSwap V2 pair contracts (most recent first), filters by USD liqu
 ```bash
 python pancake_pair_scan.py                                    # scan all pairs (recent first)
 python pancake_pair_scan.py --limit 500                        # scan only the latest 500 pairs
+python pancake_pair_scan.py --index 123456                     # scan a single pair at index 123456
 python pancake_pair_scan.py --start-index 100000               # start from pair index 100000
 python pancake_pair_scan.py --end-index 50000                  # stop at pair index 50000
 python pancake_pair_scan.py --start-index 100000 --end-index 99000  # scan a specific range

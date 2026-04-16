@@ -8,6 +8,7 @@ and new_tokens.txt (addresses of new tokens, excluding WBNB/USDT).
 Usage:
     python pancake_pair_scan.py                                    # scan all pairs (recent first)
     python pancake_pair_scan.py --limit 500                        # scan only the latest 500 pairs
+    python pancake_pair_scan.py --index 123456                     # scan a single pair at index 123456
     python pancake_pair_scan.py --start-index 100000               # start from pair index 100000
     python pancake_pair_scan.py --end-index 50000                  # stop at pair index 50000
     python pancake_pair_scan.py --start-index 100000 --end-index 99000  # scan a specific range
@@ -154,6 +155,8 @@ def write_outputs(contracts: list, txt_path: str, json_path: str, tokens_path: s
 def main():
     parser = argparse.ArgumentParser(description="Scan PancakeSwap V2 pairs by liquidity")
     parser.add_argument("--limit", type=int, default=0, help="Max number of pairs to scan (0 = all)")
+    parser.add_argument("--index", type=int, default=-1,
+                        help="Scan a single pair at this index")
     parser.add_argument("--start-index", type=int, default=-1,
                         help="Start scanning from this pair index (default: latest)")
     parser.add_argument("--end-index", type=int, default=0,
@@ -179,11 +182,15 @@ def main():
     total_pairs = factory.functions.allPairsLength().call()
     print(f"Total registered pairs: {total_pairs:,}")
 
-    start_index = args.start_index if args.start_index >= 0 else total_pairs - 1
-    start_index = min(start_index, total_pairs - 1)
-    end_index = max(args.end_index, 0)
-    if args.limit > 0:
-        end_index = max(start_index - args.limit + 1, end_index)
+    if args.index >= 0:
+        start_index = min(args.index, total_pairs - 1)
+        end_index = start_index
+    else:
+        start_index = args.start_index if args.start_index >= 0 else total_pairs - 1
+        start_index = min(start_index, total_pairs - 1)
+        end_index = max(args.end_index, 0)
+        if args.limit > 0:
+            end_index = max(start_index - args.limit + 1, end_index)
     scan_count = start_index - end_index + 1
     min_liq = args.min_liq
     print(f"Scanning from index {start_index:,} to {end_index:,} ({scan_count:,} pairs) | Min liquidity: ${min_liq:,.0f}\n")
@@ -193,6 +200,11 @@ def main():
     txt_path = "pair_contracts.txt"
     json_path = "contracts.json"
     tokens_path = "new_tokens.txt"
+    log_path = "scan.log"
+
+    # Log scan start
+    with open(log_path, "a", encoding="utf-8") as lf:
+        lf.write(f"[{datetime.now(timezone.utc).isoformat()}] START start_index={start_index} end_index={end_index}\n")
 
     for n, i in enumerate(range(start_index, end_index - 1, -1), 1):
         try:
@@ -247,6 +259,10 @@ def main():
 
     print(f"\nDone! Found {len(contracts)} pairs with liquidity >= ${min_liq:,.0f}")
     print(f"Results saved to {txt_path}, {json_path}, and {tokens_path}")
+
+    # Log scan end
+    with open(log_path, "a", encoding="utf-8") as lf:
+        lf.write(f"[{datetime.now(timezone.utc).isoformat()}] END   start_index={start_index} end_index={end_index} found={len(contracts)}\n")
 
 
 if __name__ == "__main__":

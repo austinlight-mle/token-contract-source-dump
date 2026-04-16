@@ -1,2 +1,7 @@
 .env
 .venv/
+contracts/
+contracts.json
+new_tokens.txt
+pair_contracts.txt
+scan.log
