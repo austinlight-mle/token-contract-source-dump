@@ -1,5 +1,6 @@
 .env
 .venv/
 contracts/
-contracts.txt
 contracts.json
+pair_contracts.txt
+new_tokens.txt

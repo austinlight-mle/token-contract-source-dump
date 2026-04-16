@@ -2,7 +2,8 @@
 """
 Scan PancakeSwap V2 pair contracts from most recent to oldest,
 filter by USD liquidity, and output qualifying contracts to
-contracts.txt (full BscScan URLs) and contracts.json (detailed info).
+pair_contracts.txt (full BscScan URLs), contracts.json (detailed info),
+and new_tokens.txt (addresses of new tokens, excluding WBNB/USDT).
 
 Usage:
     python pancake_pair_scan.py                        # scan all pairs (recent first)
@@ -46,6 +47,12 @@ DEXSCREENER_PAIRS_URL = "https://api.dexscreener.com/latest/dex/pairs/bsc/{}"
 DEXSCREENER_TOKENS_URL = "https://api.dexscreener.com/tokens/v1/bsc/{}"
 BSCSCAN_ADDRESS_URL = "https://bscscan.com/address/{}"
 DEFAULT_MIN_LIQUIDITY = 10_000
+
+# Well-known base token addresses (lowercased) — these are excluded from new_tokens.txt
+KNOWN_BASE_TOKENS = {
+    "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",  # WBNB
+    "0x55d398326f99059ff775485246999027b3197955",  # USDT
+}
 
 
 def get_token_price_usd(address: str, cache: dict) -> float | None:
@@ -113,13 +120,33 @@ def calc_liquidity_from_reserves(w3, pair_address, price_cache):
         return None, None, None
 
 
-def write_outputs(contracts: list, txt_path: str, json_path: str):
-    """Write results to contracts.txt and contracts.json."""
+def get_new_token_address(contract: dict) -> str | None:
+    """Return the address of the non-base token in the pair (i.e. not WBNB/USDT).
+    If neither token is a known base token, return token_a's address.
+    If both are known base tokens, return None."""
+    addr_a = (contract.get("token_a") or {}).get("address", "").lower()
+    addr_b = (contract.get("token_b") or {}).get("address", "").lower()
+    a_is_base = addr_a in KNOWN_BASE_TOKENS
+    b_is_base = addr_b in KNOWN_BASE_TOKENS
+    if a_is_base and b_is_base:
+        return None
+    if a_is_base:
+        return contract["token_b"]["address"]
+    return contract["token_a"]["address"]
+
+
+def write_outputs(contracts: list, txt_path: str, json_path: str, tokens_path: str):
+    """Write results to pair_contracts.txt, contracts.json, and new_tokens.txt."""
     with open(txt_path, "w", encoding="utf-8") as f:
         for c in contracts:
             f.write(f"{BSCSCAN_ADDRESS_URL.format(c['address'])}\n")
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(contracts, f, indent=2, ensure_ascii=False)
+    with open(tokens_path, "w", encoding="utf-8") as f:
+        for c in contracts:
+            token_addr = get_new_token_address(c)
+            if token_addr:
+                f.write(f"{token_addr}\n")
 
 
 def main():
@@ -156,8 +183,9 @@ def main():
 
     contracts: list[dict] = []
     price_cache: dict[str, float | None] = {}
-    txt_path = "contracts.txt"
+    txt_path = "pair_contracts.txt"
     json_path = "contracts.json"
+    tokens_path = "new_tokens.txt"
 
     for n, i in enumerate(range(start_index, max(start_index - scan_count, -1), -1), 1):
         try:
@@ -207,11 +235,11 @@ def main():
         })
 
         # Write incrementally so partial results are saved
-        write_outputs(contracts, txt_path, json_path)
+        write_outputs(contracts, txt_path, json_path, tokens_path)
         time.sleep(0.25)
 
     print(f"\nDone! Found {len(contracts)} pairs with liquidity >= ${min_liq:,.0f}")
-    print(f"Results saved to {txt_path} and {json_path}")
+    print(f"Results saved to {txt_path}, {json_path}, and {tokens_path}")
 
 
 if __name__ == "__main__":
