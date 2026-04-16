@@ -6,10 +6,12 @@ pair_contracts.txt (full BscScan URLs), contracts.json (detailed info),
 and new_tokens.txt (addresses of new tokens, excluding WBNB/USDT).
 
 Usage:
-    python pancake_pair_scan.py                        # scan all pairs (recent first)
-    python pancake_pair_scan.py --limit 500            # scan only the latest 500 pairs
-    python pancake_pair_scan.py --start-index 100000   # start from pair index 100000
-    python pancake_pair_scan.py --min-liq 50000        # set minimum liquidity to $50,000
+    python pancake_pair_scan.py                                    # scan all pairs (recent first)
+    python pancake_pair_scan.py --limit 500                        # scan only the latest 500 pairs
+    python pancake_pair_scan.py --start-index 100000               # start from pair index 100000
+    python pancake_pair_scan.py --end-index 50000                  # stop at pair index 50000
+    python pancake_pair_scan.py --start-index 100000 --end-index 99000  # scan a specific range
+    python pancake_pair_scan.py --min-liq 50000                    # set minimum liquidity to $50,000
 """
 
 import argparse
@@ -154,6 +156,8 @@ def main():
     parser.add_argument("--limit", type=int, default=0, help="Max number of pairs to scan (0 = all)")
     parser.add_argument("--start-index", type=int, default=-1,
                         help="Start scanning from this pair index (default: latest)")
+    parser.add_argument("--end-index", type=int, default=0,
+                        help="Stop scanning at this pair index, inclusive (default: 0)")
     parser.add_argument("--min-liq", type=float, default=DEFAULT_MIN_LIQUIDITY,
                         help=f"Minimum liquidity in USD (default: {DEFAULT_MIN_LIQUIDITY:,})")
     args = parser.parse_args()
@@ -177,9 +181,12 @@ def main():
 
     start_index = args.start_index if args.start_index >= 0 else total_pairs - 1
     start_index = min(start_index, total_pairs - 1)
-    scan_count = args.limit if args.limit > 0 else (start_index + 1)
+    end_index = max(args.end_index, 0)
+    if args.limit > 0:
+        end_index = max(start_index - args.limit + 1, end_index)
+    scan_count = start_index - end_index + 1
     min_liq = args.min_liq
-    print(f"Scanning from index {start_index:,} | Count: {scan_count:,} | Min liquidity: ${min_liq:,.0f}\n")
+    print(f"Scanning from index {start_index:,} to {end_index:,} ({scan_count:,} pairs) | Min liquidity: ${min_liq:,.0f}\n")
 
     contracts: list[dict] = []
     price_cache: dict[str, float | None] = {}
@@ -187,7 +194,7 @@ def main():
     json_path = "contracts.json"
     tokens_path = "new_tokens.txt"
 
-    for n, i in enumerate(range(start_index, max(start_index - scan_count, -1), -1), 1):
+    for n, i in enumerate(range(start_index, end_index - 1, -1), 1):
         try:
             pair_address = factory.functions.allPairs(i).call()
         except Exception as e:
