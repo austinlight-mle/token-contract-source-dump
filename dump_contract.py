@@ -58,7 +58,7 @@ def parse_source_files(source_code: str) -> dict[str, str]:
     - JSON standard input wrapped in double braces {{...}}
     - JSON standard input without double braces
     """
-    source_code = source_code.strip()
+    source_code = source_code.replace("\r\n", "\n").strip()
 
     # Multi-file: wrapped in {{ }}
     if source_code.startswith("{{") and source_code.endswith("}}"):
@@ -84,7 +84,7 @@ def parse_source_files(source_code: str) -> dict[str, str]:
     except (json.JSONDecodeError, TypeError):
         pass
 
-    # Single file - return as-is
+    # Single file
     return {"contract.sol": source_code}
 
 
